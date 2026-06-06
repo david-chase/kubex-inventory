@@ -1,16 +1,21 @@
-# [CmdletBinding()]
+[CmdletBinding()]
 param (
     [string]$host_param,
     [string]$scheme_param,
     [string]$port_param,
     [string]$user_param,
-    [string]$pass_param
+    [string]$pass_param,
+    [switch]$csv
 )
 
 Clear-Host
-Write-Host 
-Write-Host ::: Kubex Inventory - Identify software deployed in a customer environment ::: -ForegroundColor Cyan
-Write-Host 
+
+# Clear host and output banners only if not outputting raw CSV data
+if (-not $csv) {
+    Write-Host ""
+    Write-Host "::: Kubex Inventory - Identify software deployed in a customer environment :::" -ForegroundColor Cyan
+    Write-Host ""
+}
 
 # Determine Script Directory
 $ScriptDir = Split-Path -Parent -Path ${MyInvocation}.MyCommand.Definition
@@ -47,17 +52,19 @@ if (-not [string]::IsNullOrEmpty(${user_param}))   { $Settings["user"]   = ${use
 if (-not [string]::IsNullOrEmpty(${pass_param}))   { $Settings["pass"]   = ${pass_param} }
 
 # Prompt Interactively for completely empty configurations
-if ([string]::IsNullOrEmpty($Settings["host"])) {
-    $Settings["host"] = Read-Host -Prompt "Enter Host (e.g. cluster.kubex.ai)"
-}
-if ([string]::IsNullOrEmpty($Settings["user"])) {
-    $Settings["user"] = Read-Host -Prompt "Enter Username"
-}
-if ([string]::IsNullOrEmpty($Settings["pass"])) {
-    $Settings["pass"] = Read-Host -Prompt "Enter Password" -AsSecureString
+if ([string]::IsNullOrEmpty($Settings["host"])) { $Settings["host"] = Read-Host -Prompt "Enter Host (e.g. cluster.kubex.ai)" }
+if ([string]::IsNullOrEmpty($Settings["user"])) { $Settings["user"] = Read-Host -Prompt "Enter Username" }
+if ([string]::IsNullOrEmpty($Settings["pass"])) { 
+    if ($csv) {
+        $Settings["pass"] = Read-Host -Prompt "Enter Password"
+    } else {
+        $Settings["pass"] = Read-Host -Prompt "Enter Password" -AsSecureString 
+    }
 }
 
-Write-Output "Settings parsed successfully."
+if (-not $csv) {
+    Write-Output "Settings parsed successfully."
+}
 
 # 2. Parse software.csv
 if (-not (Test-Path -Path ${CsvPath})) {
@@ -65,24 +72,28 @@ if (-not (Test-Path -Path ${CsvPath})) {
     exit 1
 }
 
-# Import rules, filtering out bad lines, mapping to Software/Type/Rule string
 $SoftwareRules = @()
-$CsvData = Import-Csv -Path ${CsvPath} -Header "Software", "Type", "RawRule"
-foreach ($Row in ${CsvData}) {
-    if ([string]::IsNullOrEmpty($Row.RawRule)) { continue }
-    
-    # Parse out expression: namespace Equals dynatrace
-    if ($Row.RawRule -match '^\s*(\S+)\s+(\S+)\s+(.+)\s*$') {
-        $SoftwareRules += [PSCustomObject]@{
-            Software = $Row.Software
-            Type     = $Row.Type
-            Element  = $Matches[1].Trim()
-            Operator = $Matches[2].Trim()
-            Value    = $Matches[3].Trim()
+if (Test-Path -Path ${CsvPath}) {
+    $CsvData = Import-Csv -Path ${CsvPath} -Header "Software", "Type", "RawRule"
+    foreach ($Row in ${CsvData}) {
+        if ([string]::IsNullOrEmpty($Row.RawRule)) { continue }
+        
+        # Dynamic CSV Splitting: Extract nested 3-part syntax (Element Operator Value)
+        if ($Row.RawRule -match '^\s*(\S+)\s+(\S+)\s+(.+)\s*$') {
+            $SoftwareRules += [PSCustomObject]@{
+                Software = $Row.Software
+                Type     = $Row.Type
+                Element  = $Matches[1].Trim()
+                Operator = $Matches[2].Trim()
+                Value    = $Matches[3].Trim().Trim('"')
+            }
         }
     }
 }
-Write-Output "Software list parsed successfully."
+
+if (-not $csv) {
+    Write-Output "Software list parsed successfully."
+}
 
 # 3. Compose Base URL (Silent Step)
 $CleanScheme = $Settings["scheme"]
@@ -98,36 +109,31 @@ $BaseUrl = "${CleanScheme}${CleanHost}${CleanPort}"
 
 # 4. Authenticate and Generate JWT Web Token
 $AuthUrl = "${BaseUrl}/CIRBA/api/v2/authorize"
+$RawPass = if ($Settings["pass"] -is [System.Security.SecureString]) {
+    [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($Settings["pass"]))
+} else { 
+    $Settings["pass"] 
+}
+
 $AuthBody = @{
     userName = $Settings["user"]
-    pwd      = if ($Settings["pass"] -is [System.Security.SecureString]) { 
-                   [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($Settings["pass"])) 
-               } else { $Settings["pass"] }
+    pwd      = $RawPass
 } | ConvertTo-Json
 
+$JwtToken = $null
 try {
     $AuthResponse = Invoke-RestMethod -Uri ${AuthUrl} -Method Post -Body ${AuthBody} -ContentType "application/json; charset=utf-8"
     
-    # Defensive extraction mapping variants
-    $JwtToken = $null
-    if (${AuthResponse} -ne $null) {
-        if (${AuthResponse}.PSObject.Properties.Name -contains 'apiToken') {
-            $JwtToken = ${AuthResponse}.apiToken
-        } elseif (${AuthResponse}.PSObject.Properties.Name -contains 'token') {
-            $JwtToken = ${AuthResponse}.token
-        } elseif (${AuthResponse} -is [string]) {
-            $JwtToken = ${AuthResponse}
+    if ($AuthResponse -ne $null) {
+        if ($AuthResponse.PSObject.Properties.Name -contains 'apiToken') { 
+            $JwtToken = $AuthResponse.apiToken 
+        } elseif ($AuthResponse.PSObject.Properties.Name -contains 'token') { 
+            $JwtToken = $AuthResponse.token 
+        } elseif ($AuthResponse -is [string]) { 
+            $JwtToken = $AuthResponse 
         }
     }
-    
-    if (-not [string]::IsNullOrEmpty(${JwtToken})) {
-        $JwtToken = ${JwtToken}.Trim()
-        Write-Output "Token generated successfully."
-    } else {
-        throw "Authorization failed: Token payload missing from endpoint framework response context."
-    }
-}
-catch [System.Net.WebException] {
+} catch [System.Net.WebException] {
     $Exception = $_.Exception
     if ($Exception.Response -and $Exception.Response.StatusCode -eq 401) {
         Write-Error "Invalid credentials provided. Authentication failed."
@@ -139,12 +145,20 @@ catch [System.Net.WebException] {
     exit 1
 }
 
+if (-not $JwtToken) {
+    Write-Error "Authorization failed or token not found."
+    exit 1
+}
+
+if (-not $csv) {
+    Write-Output "Authorization token obtained successfully."
+}
+
 # 5. Query GraphQL API
 $GraphUrl = "${BaseUrl}/api/graphql/containers"
-$Headers = @{
-    "Authorization" = "Bearer ${JwtToken}"
-    "Accept"        = "application/json"
-}
+$Headers = [System.Collections.Generic.Dictionary[string,string]]::new()
+$Headers.Add("Authorization", "Bearer ${JwtToken}".Trim())
+$Headers.Add("Accept", "application/json")
 
 $QueryPayload = @"
 {
@@ -155,21 +169,17 @@ $QueryPayload = @"
 
 try {
     $GraphResponse = Invoke-RestMethod -Uri ${GraphUrl} -Method Post -Headers ${Headers} -Body ${QueryPayload} -ContentType "application/json; charset=utf-8"
-    
-    # Extract records data block safe path
-    $RawContainers = $GraphResponse.data.getContainerDetailsByViewAndFilter
-    if ($RawContainers) {
-        Write-Output "Graph API query successful."
-    } else {
-        throw "Malformed schema return payload metadata payload block context structure."
-    }
-}
-catch {
+} catch {
     Write-Error "Failed to retrieve or parse container records via GraphQL endpoint: $($_.Exception.Message)"
     exit 1
 }
 
-# Map fields seamlessly to structural aliases match
+$RawContainers = $GraphResponse.data.getContainerDetailsByViewAndFilter
+if (-not $csv) {
+    Write-Output "Graph API query context evaluated successfully."
+}
+
+# 6. Setup Tracking Entities & Sorting Hierarchy (Broad-to-Narrow Sequence)
 $Containers = $RawContainers | ForEach-Object {
     [PSCustomObject]@{
         cluster        = $_.cluster
@@ -180,112 +190,121 @@ $Containers = $RawContainers | ForEach-Object {
     }
 }
 
-# 6. Alphabetical Sorting Pipeline Execution Check
-$SortedContainers = $Containers | Sort-Object -Property container, namespace, cluster
+# Sort-Order Precedence logic: Cluster -> Namespace -> Container
+$SortedContainers = $Containers | Sort-Object -Property cluster, namespace, container
 
-# Helper Tracking Tables & States
-# structure: $ClusterSoftwareMapping["ClusterName"]["SoftwareName, TypeName"] = @("namespace1", "namespace2")
-$ClusterSoftwareMapping = @{} 
-$GlobalClusters = @{}
-$GlobalNamespaces = @{}
-$GlobalMatchesCount = 0
-$CurrentCluster = $null
+# Global Tracking Aggregations
+$ClusterSoftwareMapping = @{}
+$GlobalClusters         = @{}
+$GlobalNamespaces       = @{}
+$GlobalMatchesCount     = 0
+$CurrentCluster         = $null
 
-# Function to clear and display accumulated results for the previous cluster boundary cleanly
+# Console Output Method for Standard Text UI (Fires only if -csv switch is omitted)
 function Flush-ClusterSoftware {
     param([string]$TargetCluster)
     if ([string]::IsNullOrEmpty(${TargetCluster}) -or -not $ClusterSoftwareMapping.ContainsKey(${TargetCluster})) { return }
     
-    # Sort software names alphabetically per design requirements
-    foreach ($SoftwareKey in ($ClusterSoftwareMapping[${TargetCluster}].Keys | Sort-Object)) {
-        $NamespaceList = $ClusterSoftwareMapping[${TargetCluster}][${SoftwareKey}] | Sort-Object
-        $NamespaceCount = $NamespaceList.Count
+    $GlobalClusters[${TargetCluster}] = $true
+    Write-Host ${TargetCluster} -ForegroundColor Yellow
+    
+    $SoftwareKeys = @($ClusterSoftwareMapping[${TargetCluster}].Keys)
+    foreach ($SoftwareName in $SoftwareKeys) {
+        $SoftwareData = $ClusterSoftwareMapping[${TargetCluster}][$SoftwareName]
+        $Category = $SoftwareData.Type
+        $DistinctNamespaces = @($SoftwareData.Namespaces.Keys)
+        $NamespaceCount = $DistinctNamespaces.Count
         
-        # New Output Bracket Rule Conditioning Logic
+        $NamespaceString = ""
         if ($NamespaceCount -gt 3) {
-            $BracketContext = "${NamespaceCount} namespaces"
+            $NamespaceString = "(${NamespaceCount} namespaces)"
         } else {
-            $BracketContext = $NamespaceList -join ", "
+            $NamespaceString = "[" + ($DistinctNamespaces -join ", ") + "]"
         }
         
-        # Format string output: - <Software>, <Type> (<BracketContext>)
-        $OutputLine = "${SoftwareKey} (${BracketContext})"
+        Write-Host "  - " -NoNewline
+        Write-Host ${SoftwareName} -ForegroundColor DarkGreen -NoNewline
+        Write-Host ", ${Category} ${NamespaceString}"
         
-        # Software identified must be output in Dark Green
-        Write-Host "  - ${OutputLine}" -ForegroundColor DarkGreen
+        $GlobalMatchesCount++
     }
+}
+
+# If CSV generation parameter is verified, emit the clean, space-free header row instantly
+if ($csv) {
+    Write-Output "Software,Category,Namespace,Pod Name,Container Name"
 }
 
 # 7. Main Core Control Process Loop Evaluation
 foreach ($Pod in $SortedContainers) {
     if ([string]::IsNullOrEmpty($Pod.cluster)) { continue }
     
-    # Track metrics counts totals
-    $GlobalClusters[$Pod.cluster] = $true
-    $GlobalNamespaces["$($Pod.cluster):$($Pod.namespace)"] = $true
-
-    # Cluster Boundary Transition Management
-    if ($Pod.cluster -ne $CurrentCluster) {
-        if ($CurrentCluster -ne $null) {
+    $GlobalNamespaces[$Pod.namespace] = $true
+    
+    # Cluster Boundaries Tracking Evaluation change
+    if ($null -eq $CurrentCluster) {
+        $CurrentCluster = $Pod.cluster
+    } elseif ($CurrentCluster -ne $Pod.cluster) {
+        if (-not $csv) {
             Flush-ClusterSoftware -TargetCluster $CurrentCluster
         }
         $CurrentCluster = $Pod.cluster
-        
-        # Headings should be in Bright Yellow with no ornamentation
-        Write-Host "`n${CurrentCluster}" -ForegroundColor Yellow
-        
-        if (-not $ClusterSoftwareMapping.ContainsKey(${CurrentCluster})) {
-            $ClusterSoftwareMapping[${CurrentCluster}] = @{}
-        }
     }
-
-    # Software Evaluation Against Matching Engine Rules
+    
+    # Evaluate checking rules sequentially against target fields
     foreach ($Rule in $SoftwareRules) {
-        $TargetValue = $Pod.$($Rule.Element.ToLower())
-        if ($TargetValue -eq $null) { continue }
+        $TargetValue = $null
+        if ($Rule.Element -ieq "namespace") { $TargetValue = $Pod.namespace }
+        if ($Rule.Element -ieq "pod")       { $TargetValue = $Pod.pod }
+        if ($Rule.Element -ieq "container") { $TargetValue = $Pod.container }
         
-        $MatchFound = $false
-        $Op = $Rule.Operator
-        $MatchString = $Rule.Value
-
-        # Case-insensitive comparisons built natively into switch matching behaviors
-        switch ($Op) {
-            "Equals"           { if ($TargetValue -ieq $MatchString) { $MatchFound = $true } }
-            "Contains"         { if ($TargetValue -ilike "*${MatchString}*") { $MatchFound = $true } }
-            "StartsWith"       { if ($TargetValue -ilike "${MatchString}*") { $MatchFound = $true } }
-            "EndsWith"         { if ($TargetValue -ilike "*${MatchString}") { $MatchFound = $true } }
-            "DoesntEqual"      { if ($TargetValue -ine $MatchString) { $MatchFound = $true } }
-            "DoesntContain"    { if ($TargetValue -inotlike "*${MatchString}*") { $MatchFound = $true } }
-            "DoesntStartWith"  { if ($TargetValue -inotlike "${MatchString}*") { $MatchFound = $true } }
-            "DoesntEndWith"    { if ($TargetValue -inotlike "*${MatchString}") { $MatchFound = $true } }
+        if ($null -eq $TargetValue) { continue }
+        
+        $IsMatch = $false
+        switch ($Rule.Operator) {
+            "Equals"           { if ($TargetValue -ieq $Rule.Value) { $IsMatch = $true } }
+            "Contains"         { if ($TargetValue -ilike "*$($Rule.Value)*") { $IsMatch = $true } }
+            "StartsWith"       { if ($TargetValue -ilike "$($Rule.Value)*") { $IsMatch = $true } }
+            "EndsWith"         { if ($TargetValue -ilike "*$($Rule.Value)") { $IsMatch = $true } }
+            "DoesntContain"    { if ($TargetValue -notlike "*$($Rule.Value)*") { $IsMatch = $true } }
+            "DoesntEqual"      { if ($TargetValue -ne $Rule.Value) { $IsMatch = $true } }
+            "DoesntStartWith"  { if ($TargetValue -notlike "$($Rule.Value)*") { $IsMatch = $true } }
+            "DoesntEndWith"    { if ($TargetValue -notlike "*$($Rule.Value)") { $IsMatch = $true } }
         }
-
-        if ($MatchFound) {
-            $SoftwareKey = "$($Rule.Software), $($Rule.Type)"
-            
-            # If this piece of software hasn't been logged in this cluster yet, initialize its namespace tracker array
-            if (-not $ClusterSoftwareMapping[${CurrentCluster}].ContainsKey(${SoftwareKey})) {
-                $ClusterSoftwareMapping[${CurrentCluster}][${SoftwareKey}] = @()
+        
+        if ($IsMatch) {
+            if ($csv) {
+                # Immediate inline CSV record row delivery streaming to StdOut with no spaces after commas
+                Write-Output "$($Rule.Software),$($Rule.Type),$($Pod.namespace),$($Pod.pod),$($Pod.container)"
                 $GlobalMatchesCount++
-            }
-            
-            # Uniquely accumulate the matching namespace under this cluster's software record
-            if ($ClusterSoftwareMapping[${CurrentCluster}][${SoftwareKey}] -notcontains $Pod.namespace) {
-                $ClusterSoftwareMapping[${CurrentCluster}][${SoftwareKey}] += $Pod.namespace
+                $GlobalClusters[$Pod.cluster] = $true
+            } else {
+                if (-not $ClusterSoftwareMapping.ContainsKey($Pod.cluster)) {
+                    $ClusterSoftwareMapping[$Pod.cluster] = @{}
+                }
+                if (-not $ClusterSoftwareMapping[$Pod.cluster].ContainsKey($Rule.Software)) {
+                    $ClusterSoftwareMapping[$Pod.cluster][$Rule.Software] = @{
+                        Type       = $Rule.Type
+                        Namespaces = @{}
+                    }
+                }
+                $ClusterSoftwareMapping[$Pod.cluster][$Rule.Software].Namespaces[$Pod.namespace] = $true
             }
         }
     }
 }
 
-# Flush leftover records for last evaluated block item boundary elements
-if ($CurrentCluster -ne $null) {
+# Flush trailing edge item record tracking context block remaining
+if ($null -ne $CurrentCluster -and -not $csv) {
     Flush-ClusterSoftware -TargetCluster $CurrentCluster
 }
 
-# 8. Report Summary Analytics
-Write-Output ""
-Write-Output "Total clusters: $($GlobalClusters.Count)"
-Write-Output "Total namespaces: $($GlobalNamespaces.Count)"
-Write-Output "Total pieces of software identified: ${GlobalMatchesCount}"
+# 8. Report Summary Analytics (Suppressed entirely if running in -csv streaming mode)
+if (-not $csv) {
+    Write-Output ""
+    Write-Output "Total clusters: $($GlobalClusters.Count)"
+    Write-Output "Total namespaces: $($GlobalNamespaces.Count)"
+    Write-Output "Total pieces of software identified: ${GlobalMatchesCount}"
+}
 
 exit 0

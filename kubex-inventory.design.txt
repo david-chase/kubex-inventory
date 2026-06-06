@@ -21,6 +21,9 @@ scheme - This is the protocol we will use to compose our URL.  It should default
 port - This is the port we use to compose our URL.  It should default to ":8443"
 user - This is the user name we will use to request a JWT token.
 pass - This is the password we will use to request a JWT token.
+csv - This is a switch that is false by default.
+
+If the -csv switch is provided on the command-line then the program should suppress ALL Write-Host output.
 
 About software.csv
 ------------------
@@ -122,6 +125,7 @@ Your current instructions are simply to:
 - Authenticate and generate the web token.  Output a simple, one-line status without colour or decoration if the token is generated successfully.
 - Query the graph API to return a list of all pods in the environment.  Output a simple, one-line status without colour or decoration to confirm the Graph API query was successful.
 - Sort the list of containers alphabetically, first by container name, then namespace, then cluster.
+- If the -csv switch was specified on the command-line then use Write-Output to output "Software,Category,Namespace,Pod Name,Container Name" to StdOut.
 - This is the main control loop.  Loop through each pod in the environment.
     - Check and keep track of the cluster name.  Every time we start processing a new cluster name we will output only the cluster name in bright yellow, with no ornamentation.
     - Check and keep track of the current namespace.
@@ -130,7 +134,9 @@ Your current instructions are simply to:
     - As soon as we detect we've move on to a new cluster, output a list of software found in the previous cluster.  It should be in the format:
         - <Software name>, <Software category> (<comma-separated list of namespace where it was found>)
     - Only output the piece of software once per cluster, with a list of every namespace where it was found in brackets.
-    - If the number of namespaces where the software was found is greater than 3, then instead simple output "(X namespaces)", where "X" is the number of namespaces where it was found.
+    - If the number of namespaces where the software was found is greater than 3, then instead simply output "(X namespaces)", where "X" is the number of namespaces where it was found.
+    - If the -csv switch was specified on the command-line, then only output the current pod to StdOut using the Write-Output command.  The output should be in CSV format in the following format:
+        <Software name>, <Software category>, <namespace>, <pod name>, <container name> 
 - After we've looped through every pod in the environment, output some summary stats:
     - Total clusters
     - Total namespaces
