@@ -1,0 +1,291 @@
+# [CmdletBinding()]
+param (
+    [string]$host_param,
+    [string]$scheme_param,
+    [string]$port_param,
+    [string]$user_param,
+    [string]$pass_param
+)
+
+Clear-Host
+Write-Host 
+Write-Host ::: Kubex Inventory - Identify software deployed in a customer environment ::: -ForegroundColor Cyan
+Write-Host 
+
+# Determine Script Directory
+$ScriptDir = Split-Path -Parent -Path ${MyInvocation}.MyCommand.Definition
+$IniPath = Join-Path -Path ${ScriptDir} -ChildPath "kubex-inventory.ini"
+$CsvPath = Join-Path -Path ${ScriptDir} -ChildPath "software.csv"
+
+# Initialize Settings Dictionary
+$Settings = @{
+    "host"   = $null
+    "scheme" = "https://"
+    "port"   = ":8443"
+    "user"   = $null
+    "pass"   = $null
+}
+
+# 1. Read Settings Hierarchy: INI -> Command-Line -> Prompt Fallback
+if (Test-Path -Path ${IniPath}) {
+    Get-Content -Path ${IniPath} | ForEach-Object {
+        if ($_ -match '^\s*([^=]+)\s*=\s*(.*)\s*$') {
+            $Key = $Matches[1].Trim().ToLower()
+            $Value = $Matches[2].Trim()
+            if ($Settings.ContainsKey(${Key})) {
+                $Settings[${Key}] = ${Value}
+            }
+        }
+    }
+}
+
+# Apply Command-Line Overrides explicitly
+if (-not [string]::IsNullOrEmpty(${host_param}))   { $Settings["host"]   = ${host_param} }
+if (-not [string]::IsNullOrEmpty(${scheme_param})) { $Settings["scheme"] = ${scheme_param} }
+if (-not [string]::IsNullOrEmpty(${port_param}))   { $Settings["port"]   = ${port_param} }
+if (-not [string]::IsNullOrEmpty(${user_param}))   { $Settings["user"]   = ${user_param} }
+if (-not [string]::IsNullOrEmpty(${pass_param}))   { $Settings["pass"]   = ${pass_param} }
+
+# Prompt Interactively for completely empty configurations
+if ([string]::IsNullOrEmpty($Settings["host"])) {
+    $Settings["host"] = Read-Host -Prompt "Enter Host (e.g. cluster.kubex.ai)"
+}
+if ([string]::IsNullOrEmpty($Settings["user"])) {
+    $Settings["user"] = Read-Host -Prompt "Enter Username"
+}
+if ([string]::IsNullOrEmpty($Settings["pass"])) {
+    $Settings["pass"] = Read-Host -Prompt "Enter Password" -AsSecureString
+}
+
+Write-Output "Settings parsed successfully."
+
+# 2. Parse software.csv
+if (-not (Test-Path -Path ${CsvPath})) {
+    Write-Error "Required reference file software.csv not detected."
+    exit 1
+}
+
+# Import rules, filtering out bad lines, mapping to Software/Type/Rule string
+$SoftwareRules = @()
+$CsvData = Import-Csv -Path ${CsvPath} -Header "Software", "Type", "RawRule"
+foreach ($Row in ${CsvData}) {
+    if ([string]::IsNullOrEmpty($Row.RawRule)) { continue }
+    
+    # Parse out expression: namespace Equals dynatrace
+    if ($Row.RawRule -match '^\s*(\S+)\s+(\S+)\s+(.+)\s*$') {
+        $SoftwareRules += [PSCustomObject]@{
+            Software = $Row.Software
+            Type     = $Row.Type
+            Element  = $Matches[1].Trim()
+            Operator = $Matches[2].Trim()
+            Value    = $Matches[3].Trim()
+        }
+    }
+}
+Write-Output "Software list parsed successfully."
+
+# 3. Compose Base URL (Silent Step)
+$CleanScheme = $Settings["scheme"]
+if (-not ($CleanScheme -match '://$')) {
+    $CleanScheme = "${CleanScheme}://"
+}
+$CleanHost = $Settings["host"] -replace '^https?://', ''
+$CleanPort = $Settings["port"]
+if (-not ($CleanPort -match '^:')) {
+    $CleanPort = ":${CleanPort}"
+}
+$BaseUrl = "${CleanScheme}${CleanHost}${CleanPort}"
+
+# 4. Authenticate and Generate JWT Web Token
+$AuthUrl = "${BaseUrl}/CIRBA/api/v2/authorize"
+$AuthBody = @{
+    userName = $Settings["user"]
+    pwd      = if ($Settings["pass"] -is [System.Security.SecureString]) { 
+                   [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($Settings["pass"])) 
+               } else { $Settings["pass"] }
+} | ConvertTo-Json
+
+try {
+    $AuthResponse = Invoke-RestMethod -Uri ${AuthUrl} -Method Post -Body ${AuthBody} -ContentType "application/json; charset=utf-8"
+    
+    # Defensive extraction mapping variants
+    $JwtToken = $null
+    if (${AuthResponse} -ne $null) {
+        if (${AuthResponse}.PSObject.Properties.Name -contains 'apiToken') {
+            $JwtToken = ${AuthResponse}.apiToken
+        } elseif (${AuthResponse}.PSObject.Properties.Name -contains 'token') {
+            $JwtToken = ${AuthResponse}.token
+        } elseif (${AuthResponse} -is [string]) {
+            $JwtToken = ${AuthResponse}
+        }
+    }
+    
+    if (-not [string]::IsNullOrEmpty(${JwtToken})) {
+        $JwtToken = ${JwtToken}.Trim()
+        Write-Output "Token generated successfully."
+    } else {
+        throw "Authorization failed: Token payload missing from endpoint framework response context."
+    }
+}
+catch [System.Net.WebException] {
+    $Exception = $_.Exception
+    if ($Exception.Response -and $Exception.Response.StatusCode -eq 401) {
+        Write-Error "Invalid credentials provided. Authentication failed."
+    } elseif ($Exception.Response -and $Exception.Response.StatusCode -eq 404) {
+        Write-Error "Target URL path configuration was invalid. Tested Endpoint: ${AuthUrl}"
+    } else {
+        Write-Error "Connection error during login sequence: $($_.Exception.Message)"
+    }
+    exit 1
+}
+
+# 5. Query GraphQL API
+$GraphUrl = "${BaseUrl}/api/graphql/containers"
+$Headers = @{
+    "Authorization" = "Bearer ${JwtToken}"
+    "Accept"        = "application/json"
+}
+
+$QueryPayload = @"
+{
+  "query": "query K8sData_ALL { getContainerDetailsByViewAndFilter ( viewId: \"a2823ef2-5c59-41b0-bcc7-abfb2a9e1c0e\", filterId: \"cf1e8b62-a5b7-46fb-824a-df30cd30da2e\", treeviewPath: \"Containers\") { cluster namespace controllerType podService containerName } }",
+  "variables": {}
+}
+"@
+
+try {
+    $GraphResponse = Invoke-RestMethod -Uri ${GraphUrl} -Method Post -Headers ${Headers} -Body ${QueryPayload} -ContentType "application/json; charset=utf-8"
+    
+    # Extract records data block safe path
+    $RawContainers = $GraphResponse.data.getContainerDetailsByViewAndFilter
+    if ($RawContainers) {
+        Write-Output "Graph API query successful."
+    } else {
+        throw "Malformed schema return payload metadata payload block context structure."
+    }
+}
+catch {
+    Write-Error "Failed to retrieve or parse container records via GraphQL endpoint: $($_.Exception.Message)"
+    exit 1
+}
+
+# Map fields seamlessly to structural aliases match
+$Containers = $RawContainers | ForEach-Object {
+    [PSCustomObject]@{
+        cluster        = $_.cluster
+        namespace      = $_.namespace
+        controllerType = $_.controllerType
+        pod            = $_.podService
+        container      = $_.containerName
+    }
+}
+
+# 6. Alphabetical Sorting Pipeline Execution Check
+$SortedContainers = $Containers | Sort-Object -Property container, namespace, cluster
+
+# Helper Tracking Tables & States
+# structure: $ClusterSoftwareMapping["ClusterName"]["SoftwareName, TypeName"] = @("namespace1", "namespace2")
+$ClusterSoftwareMapping = @{} 
+$GlobalClusters = @{}
+$GlobalNamespaces = @{}
+$GlobalMatchesCount = 0
+$CurrentCluster = $null
+
+# Function to clear and display accumulated results for the previous cluster boundary cleanly
+function Flush-ClusterSoftware {
+    param([string]$TargetCluster)
+    if ([string]::IsNullOrEmpty(${TargetCluster}) -or -not $ClusterSoftwareMapping.ContainsKey(${TargetCluster})) { return }
+    
+    # Sort software names alphabetically per design requirements
+    foreach ($SoftwareKey in ($ClusterSoftwareMapping[${TargetCluster}].Keys | Sort-Object)) {
+        $NamespaceList = $ClusterSoftwareMapping[${TargetCluster}][${SoftwareKey}] | Sort-Object
+        $NamespaceCount = $NamespaceList.Count
+        
+        # New Output Bracket Rule Conditioning Logic
+        if ($NamespaceCount -gt 3) {
+            $BracketContext = "${NamespaceCount} namespaces"
+        } else {
+            $BracketContext = $NamespaceList -join ", "
+        }
+        
+        # Format string output: - <Software>, <Type> (<BracketContext>)
+        $OutputLine = "${SoftwareKey} (${BracketContext})"
+        
+        # Software identified must be output in Dark Green
+        Write-Host "  - ${OutputLine}" -ForegroundColor DarkGreen
+    }
+}
+
+# 7. Main Core Control Process Loop Evaluation
+foreach ($Pod in $SortedContainers) {
+    if ([string]::IsNullOrEmpty($Pod.cluster)) { continue }
+    
+    # Track metrics counts totals
+    $GlobalClusters[$Pod.cluster] = $true
+    $GlobalNamespaces["$($Pod.cluster):$($Pod.namespace)"] = $true
+
+    # Cluster Boundary Transition Management
+    if ($Pod.cluster -ne $CurrentCluster) {
+        if ($CurrentCluster -ne $null) {
+            Flush-ClusterSoftware -TargetCluster $CurrentCluster
+        }
+        $CurrentCluster = $Pod.cluster
+        
+        # Headings should be in Bright Yellow with no ornamentation
+        Write-Host "`n${CurrentCluster}" -ForegroundColor Yellow
+        
+        if (-not $ClusterSoftwareMapping.ContainsKey(${CurrentCluster})) {
+            $ClusterSoftwareMapping[${CurrentCluster}] = @{}
+        }
+    }
+
+    # Software Evaluation Against Matching Engine Rules
+    foreach ($Rule in $SoftwareRules) {
+        $TargetValue = $Pod.$($Rule.Element.ToLower())
+        if ($TargetValue -eq $null) { continue }
+        
+        $MatchFound = $false
+        $Op = $Rule.Operator
+        $MatchString = $Rule.Value
+
+        # Case-insensitive comparisons built natively into switch matching behaviors
+        switch ($Op) {
+            "Equals"           { if ($TargetValue -ieq $MatchString) { $MatchFound = $true } }
+            "Contains"         { if ($TargetValue -ilike "*${MatchString}*") { $MatchFound = $true } }
+            "StartsWith"       { if ($TargetValue -ilike "${MatchString}*") { $MatchFound = $true } }
+            "EndsWith"         { if ($TargetValue -ilike "*${MatchString}") { $MatchFound = $true } }
+            "DoesntEqual"      { if ($TargetValue -ine $MatchString) { $MatchFound = $true } }
+            "DoesntContain"    { if ($TargetValue -inotlike "*${MatchString}*") { $MatchFound = $true } }
+            "DoesntStartWith"  { if ($TargetValue -inotlike "${MatchString}*") { $MatchFound = $true } }
+            "DoesntEndWith"    { if ($TargetValue -inotlike "*${MatchString}") { $MatchFound = $true } }
+        }
+
+        if ($MatchFound) {
+            $SoftwareKey = "$($Rule.Software), $($Rule.Type)"
+            
+            # If this piece of software hasn't been logged in this cluster yet, initialize its namespace tracker array
+            if (-not $ClusterSoftwareMapping[${CurrentCluster}].ContainsKey(${SoftwareKey})) {
+                $ClusterSoftwareMapping[${CurrentCluster}][${SoftwareKey}] = @()
+                $GlobalMatchesCount++
+            }
+            
+            # Uniquely accumulate the matching namespace under this cluster's software record
+            if ($ClusterSoftwareMapping[${CurrentCluster}][${SoftwareKey}] -notcontains $Pod.namespace) {
+                $ClusterSoftwareMapping[${CurrentCluster}][${SoftwareKey}] += $Pod.namespace
+            }
+        }
+    }
+}
+
+# Flush leftover records for last evaluated block item boundary elements
+if ($CurrentCluster -ne $null) {
+    Flush-ClusterSoftware -TargetCluster $CurrentCluster
+}
+
+# 8. Report Summary Analytics
+Write-Output ""
+Write-Output "Total clusters: $($GlobalClusters.Count)"
+Write-Output "Total namespaces: $($GlobalNamespaces.Count)"
+Write-Output "Total pieces of software identified: ${GlobalMatchesCount}"
+
+exit 0

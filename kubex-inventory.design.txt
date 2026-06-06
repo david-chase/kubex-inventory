@@ -1,0 +1,138 @@
+In this project we are creating a PowerShell script called "kubex-inventory".  The purpose of this script is to identify a list of software packages in a Kubernetes cluster or clusters.  It will do this by:
+
+1. Begin by reading a number of settings.  These will be provided by command-line.  If they are not provided by command-line the program will default to reading the settings from kubex-inventory.ini.  Failing that it will interactively prompt for them. 
+2. Connecting to a REST API end-point to generate a JWT web token
+3. Pass this token to a Graph API end-point that will return all the containers in a Kubernetes environment along with additional data associated with these containers like the namespace they're running in, and the pod owner name.
+4. It will scan a list of known software packages defined in a file named software.csv and use logical matching rules defined in the file to determine if any of the pieces of software in software.csv match our pod data.  
+
+Reading settings
+----------------
+kubex-inventory.ini will always be found in the same folder that the script is running from.
+
+You should first look for a setting in the ini file.  
+If it's not found there look for the setting in the command-line.  
+Command-line settings override any similar setting in the ini file.
+If it's not found in either of those places, prompt for it.11
+
+Here is a list of allowed settings:
+
+host - This is the host we will be connecting to.  It's in the format "<customername>.kubex.ai" or "<customername>.densify.com"
+scheme - This is the protocol we will use to compose our URL.  It should default to "https://"
+port - This is the port we use to compose our URL.  It should default to ":8443"
+user - This is the user name we will use to request a JWT token.
+pass - This is the password we will use to request a JWT token.
+
+About software.csv
+------------------
+software.csv should always be located in the same folder as the script itself.
+You should error out if the file isn't detected.
+It is a comma-delimited text file.
+It is in this format:
+
+<Software name>, <Software category>, "<Matching rule>"
+<Software name>, <Software category>, "<Matching rule>"
+etc.
+
+Matching rules
+------------------------
+We detect software by going through a list of pods from our Graph QL query, and determining if any of them correspond to a matching rule.  
+We then flag that software as detected and track the cluster and namespace where the pod exists.  
+We will later report on software detected by namespace and cluster.  We will not need to track every single pod were a piece of software was found, only the namespace and cluster.
+
+Matching rules are defined in the format: 
+
+<object> <operator> <string>
+
+<object> can be "namespace" or "pod" or "container"
+Valid <operator> values are: Contains, Equals, StartsWith, EndsWith, DoesntContain, DoesntEqual, DoesntStartWith, and DoesntEndWith
+<string> is the string you want to compare to.
+<object>, <operator>, and <string> should all be case-insensitive, as should be all comparisons using them.
+
+So for example:
+
+"namespace Equals monitoring" - This would create a match if the namespace was equal to "monitoring"
+"pod Contains the" This would create a match if the pod name is "prometheus" or "lathe" or otherwise contains the string "the"
+
+Composing the URL
+-----------------
+Remember when composing URLs that variables within quotes must be surrounded by curly braces.  For example "${CleanScheme}"
+When making API calls we will start by creating a base URL and then appending an endpoint to it.
+Compose the base URL in this format:
+
+<scheme><host><port>
+
+Parsing rules:
+If <scheme> doesn't end in "://" be sure to add it.
+If <port> doesn't begin with ":" be sure to add it.
+
+
+Authenticating to the API
+-------------------------
+The authentication endpoint is the base URL + "/CIRBA/api/v2/authorize"
+The method is POST.
+The message body should be in this format:
+{
+	"userName": "<user>",
+	"pwd" : "<pass>"
+}
+If the method returns "401 (Unauthorized)" be sure to trap the error and output a friendly message that the credentials were invalid.
+If the method returns "404" be sure to trap the error and output a friendly message that the URL was invalid, and output the full endpoint we used.
+
+Querying the list of pods
+-------------------------
+The Graph API query end-point is the base URL + "/api/graphql/containers"
+The method is POST.
+Be sure to pass our authentication token as part of the request.
+The message body should be in this format:
+
+query K8sData_ALL {
+    getContainerDetailsByViewAndFilter (
+        viewId: "a2823ef2-5c59-41b0-bcc7-abfb2a9e1c0e",
+        filterId: "cf1e8b62-a5b7-46fb-824a-df30cd30da2e",
+        treeviewPath: "Containers") {       
+    cluster
+    namespace
+    controllerType
+    podService
+    containerName
+    }
+}
+
+This will return a list of all pods in the environment, as well as the cluster, namespace, controller type, and pod name.
+From now on I will refer to the field "podService" as "pod" or "pod name".  I will refer to "containerName" as "container" or "container name".
+
+Design guidance
+---------------
+Follow these guidelines when producing output:
+    - Don't use "-" or "=" symbols to denote headers or separate lines of output
+    - Status text should have no colour or decorations
+    - Headings should be in bright yellow
+    - Subheadings should be in bright green
+    - Software identified should be in Dark Green
+    - Summary info should have no colour or decorations
+
+Writing the script
+------------------
+We will build out functionality slowly, testing along the way.
+
+Your current instructions are simply to:
+- Parse all settings according to the provided rules.  Output a simple, one-line status without colour or decoration.
+- Parse the software list in software.csv. Output a simple, one-line status without colour or decoration.
+- Compose the base URL. Output nothing to the screen.  
+- Authenticate and generate the web token.  Output a simple, one-line status without colour or decoration if the token is generated successfully.
+- Query the graph API to return a list of all pods in the environment.  Output a simple, one-line status without colour or decoration to confirm the Graph API query was successful.
+- Sort the list of containers alphabetically, first by container name, then namespace, then cluster.
+- This is the main control loop.  Loop through each pod in the environment.
+    - Check and keep track of the cluster name.  Every time we start processing a new cluster name we will output only the cluster name in bright yellow, with no ornamentation.
+    - Check and keep track of the current namespace.
+    - Compare this pod to each of our matching rules.
+    - If the pod matches one of our rules, note the namespace in which it was found.
+    - As soon as we detect we've move on to a new cluster, output a list of software found in the previous cluster.  It should be in the format:
+        - <Software name>, <Software category> (<comma-separated list of namespace where it was found>)
+    - Only output the piece of software once per cluster, with a list of every namespace where it was found in brackets.
+    - If the number of namespaces where the software was found is greater than 3, then instead simple output "(X namespaces)", where "X" is the number of namespaces where it was found.
+- After we've looped through every pod in the environment, output some summary stats:
+    - Total clusters
+    - Total namespaces
+    - Total pieces of software identified
+- Exit gracefully.
