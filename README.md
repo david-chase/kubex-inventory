@@ -54,7 +54,7 @@ Kubescape, Security Suite, "pod Contains kubescape"
 Kubex, Kubernetes Optimization, "container StartsWith kubex"
 ```
 
-## Disclaimers
+## Known Limitations
 The tool doesn't output software versions -- that data doesn't exist in the Kubex schema.
 
 The tool can't detect software that runs as a native sidecar because Kubex doesn't collect data for init containers.
