@@ -1,19 +1,19 @@
 # Summary
 This script will connect to a Kubex instance and download information on every container running in the environment.  It will then output a list of every cluster, what software was found in it, and the namespacee in which it was found.
 
-# Syntax
+## Syntax
 `kubex-inventory.ps1 [-user=<username>] [-pass=<instance password>] [-host <instance.kubex.ai> | <instance.densify.com>] [-csv]`
 
 All command-line parameters may also be specified in a file named kubex-inventory.ini which must be saved in the same folder as the script.  (Note that the -csv option only works from the command-line.)
 
-# CSV Output
+## CSV Output
 If you specify the -csv option from the command-line then all output will be in CSV format for import into Excel.  One line for each Container that matches a known software package.
 
-## CSV example
+#### CSV example
 
 `kubex-inventory.ps1 -user "dchase@densify.com" -pass "NotMyPassword" -host "sandbox.kubex.ai" -csv > "Sandbox Software.csv"`
 
-# How it works
+## How it works
 There's no magic going on here.  `software.csv` contains a list of software packages and the matching logic to identify them.  The format of the file is:
 
 `<Software Package>, <Software Category>, "<Matching rule>"`
@@ -28,10 +28,10 @@ Matching rules must be surrounded by double quotes and are in the format:
 
 All values in `software.csv` are case insensitive.
 
-## Matching rule examples
+#### Matching rule examples
 Karpenter, Node Autoscaler, "container Equals karpenter"<br>
 Kubescape, Security Suite, "pod Contains kubescape"<br>
 Kubex, Kubernetes Optimization, "container StartsWith kubex"<br>
 
-# Disclaimer
+## Disclaimer
 The software list can detect a couple hundred Kubernetes software packages, but it's not even close to complete.  If it's not detecting a piece of software you know is in the cluster, add a signature in `software.csv`.  Enjoy!
