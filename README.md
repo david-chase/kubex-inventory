@@ -2,9 +2,9 @@
 This script will connect to a Kubex instance and download information on every container running in the environment.  It will then output a list of every cluster, what software was found in it, and the namespacee in which it was found.
 
 # Syntax
-`kubex-inventory.ps1 [-user=<username>] [-pass=<instance password>] [-host <instance.kubex.ai>|<instance.densify.com>] [-csv]`
+`kubex-inventory.ps1 [-user=<username>] [-pass=<instance password>] [-host <instance.kubex.ai> | <instance.densify.com>] [-csv]`
 
-All command-line parameters may also be specified in a file named kubex-inventory.ini which must be saved in the same folder as the script.  (Note that the -csv option only works on the command-line.)
+All command-line parameters may also be specified in a file named kubex-inventory.ini which must be saved in the same folder as the script.  (Note that the -csv option only works from the command-line.)
 
 # CSV Output
 If you specify the -csv option from the command-line then all output will be in CSV format for import into Excel.  One line for each Container that matches a known software package.
