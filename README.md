@@ -20,7 +20,7 @@ There's no magic going on here.  `software.csv` contains a list of software pack
 
 Matching rules must be surrounded by double quotes and are in the format:
 
-`"<Object Type>, <Operator>, <String>"`
+`"<Object Type> <Operator> <String>"`
 
 **Object Type** can be "namespace", "pod", or "container".
 **Operator** can be "Equals", "DoesntEqual", "Contains", "DoesntContain", "StartsWith", "DoesntStartWith", "EndsWith", or "DoesntEndWith".
