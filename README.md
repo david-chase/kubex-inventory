@@ -26,6 +26,8 @@ Matching rules must be surrounded by double quotes and are in the format:
 **Operator** can be "Equals", "DoesntEqual", "Contains", "DoesntContain", "StartsWith", "DoesntStartWith", "EndsWith", or "DoesntEndWith".<br>
 **String** is the string to match.
 
+All values in `software.csv` are case insensitive.
+
 ## Matching rule examples
 Karpenter, Node Autoscaler, "container Equals karpenter"<br>
 Kubescape, Security Suite, "pod Contains kubescape"<br>
