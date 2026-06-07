@@ -13,6 +13,11 @@ If you specify the -csv option from the command-line all output will be in CSV f
 
 `kubex-inventory.ps1 -user "dchase@densify.com" -pass "NotMyPassword" -host "sandbox.kubex.ai" -csv > "Sandbox Software.csv"`
 
+#### Sample command-line
+Here is an interesting sample command-line that will scan a customer instance and identify every instance of Kubex Automation components.  This allows you to see if they've upgraded from the Kubex Automation Controller (Deprecated) to the Kubex Automation Engine.
+
+`kubex-inventory.ps1 -instance sandbox | grep "Kubex Automation"`
+
 ## How it works
 There's no magic going on here.  `software.csv` contains a list of software packages and the matching logic to identify them.  The format of the file is:
 
@@ -34,11 +39,6 @@ Karpenter, Node Autoscaler, "container Equals karpenter"
 Kubescape, Security Suite, "pod Contains kubescape"
 Kubex, Kubernetes Optimization, "container StartsWith kubex"
 ```
-
-## Sample command-line
-Here is an interesting sample command-line that will scan a customer instance and identify every instance of Kubex Automation components.  This allows you to see if they've upgraded from the Kubex Automation Controller (Deprecated) to the Kubex Automation Engine.
-
-`kubex-inventory.ps1 -instance sandbox | grep "Kubex Automation"`
 
 ## Disclaimers
 The tool doesn't output software versions -- that data doesn't exist in the Kubex schema.
