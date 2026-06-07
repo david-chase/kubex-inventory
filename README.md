@@ -5,8 +5,6 @@ This script will connect to a Kubex instance and show you a list of all the soft
 `kubex-inventory.ps1 [-user=<username>] [-pass=<instance password>] [-instance <instancename>] [-baseurl ".kubex.ai" | ".densify.com" ] [-csv]`
 
 ## Examples
-If you specify the -csv option from the command-line all output will be in CSV format for import into Excel.  One line for each Container that matches a known software package.
-
 #### CSV example
 This will save the output in .CSV format for slicing & dicing in Excel.  This is NOT a readable format, it's for generating reports.
 
