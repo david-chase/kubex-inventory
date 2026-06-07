@@ -2,21 +2,32 @@
 This script will connect to a Kubex instance and download information on every container running in the environment.  It will then output a list of every cluster, what software was found in it, and the namespacee in which it was found.
 
 ## Syntax
-`kubex-inventory.ps1 [-user=<username>] [-pass=<instance password>] [-instance <instancenam>] [-baseurl ".kubex.ai" | ".densify.com" ] [-csv]`
-
-All command-line parameters may also be specified in a file named kubex-inventory.ini which must be saved in the same folder as the script.  (Note that the -csv option only works from the command-line.)
+`kubex-inventory.ps1 [-user=<username>] [-pass=<instance password>] [-instance <instancename>] [-baseurl ".kubex.ai" | ".densify.com" ] [-csv]`
 
 ## Examples
 If you specify the -csv option from the command-line all output will be in CSV format for import into Excel.  One line for each Container that matches a known software package.
 
 #### CSV example
 
-`kubex-inventory.ps1 -user "dchase@densify.com" -pass "NotMyPassword" -host "sandbox.kubex.ai" -csv > "Sandbox Software.csv"`
+`kubex-inventory.ps1 -user "dchase@densify.com" -pass "NotMyPassword" -instance "sandbox" -csv > "Sandbox Software.csv"`
 
 #### Detecting Kubex Automation upgrade
 Here is an interesting sample command-line that will scan a customer instance and identify every instance of Kubex Automation components.  This allows you to see if they've upgraded from the Kubex Automation Controller (Deprecated) to the Kubex Automation Engine.
 
 `kubex-inventory.ps1 -instance sandbox | grep "Kubex Automation"`
+
+## Saving defaults
+All command-line parameters may also be specified in a file named `kubex-inventory.ini` which must be saved in the same folder as the script.  
+
+Here's a sample `kubex-inventory.ini`
+```
+user=dchase@densify.com
+pass=NotMyPassword
+baseurl=.kubex.ai
+```
+
+(Note that the -csv option only works from the command-line.)
+
 
 ## How it works
 Simple pattern matching.  `software.csv` contains a list of software packages and the matching logic to identify them.  The format of the file is:
