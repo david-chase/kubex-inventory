@@ -1,5 +1,5 @@
 # Summary
-This script will connect to a Kubex instance and download information on every container running in the environment.  It will then output a list of every cluster, what software was found in it, and the namespacee in which the software was found.
+This script will connect to a Kubex instance and show you a list of all the software running in that environment, by cluster and namespace.  It does so by connecting to the instance, running a Graph API query to return every container running in the cluster, then comparing those containers, pods, and namespaces against a known list of software signatures.  It's not fool-proof, but it's a start!
 
 ## Syntax
 `kubex-inventory.ps1 [-user=<username>] [-pass=<instance password>] [-instance <instancename>] [-baseurl ".kubex.ai" | ".densify.com" ] [-csv]`
