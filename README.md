@@ -1,5 +1,5 @@
 # Summary
-This script will connect to a Kubex instance and download information on every container running in the environment.  It will then output a list of every cluster, what software was found in it, and the namespacee in which it was found.
+This script will connect to a Kubex instance and download information on every container running in the environment.  It will then output a list of every cluster, what software was found in it, and the namespacee in which the software was found.
 
 ## Syntax
 `kubex-inventory.ps1 [-user=<username>] [-pass=<instance password>] [-instance <instancename>] [-baseurl ".kubex.ai" | ".densify.com" ] [-csv]`
