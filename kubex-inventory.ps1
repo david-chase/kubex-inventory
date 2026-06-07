@@ -198,7 +198,7 @@ function Flush-ClusterSoftware {
     if ([string]::IsNullOrEmpty(${TargetCluster}) -or -not $ClusterSoftwareMapping.ContainsKey(${TargetCluster})) { return }
     
     $GlobalClusters[${TargetCluster}] = $true
-    Write-Output "`n${TargetCluster}" 
+    Write-Output "`n## ${TargetCluster}" 
     
     # Sort software names alphabetically
     $SoftwareKeys = @($ClusterSoftwareMapping[${TargetCluster}].Keys) | Sort-Object
