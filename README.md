@@ -11,7 +11,7 @@ If you specify the -csv option from the command-line then all output will be in 
 
 ## CSV example
 
-`kubex-inventory.ps1 -user "dchase@densify.com" -pass "NotMyPassword" -host "sandbox.kubex.ai" -csv > "Sandbox Software.csv"
+`kubex-inventory.ps1 -user "dchase@densify.com" -pass "NotMyPassword" -host "sandbox.kubex.ai" -csv > "Sandbox Software.csv"`
 
 # How it works
 There's no magic going on here.  `software.csv` contains a list of software packages and the matching logic to identify them.  The format of the file is:
