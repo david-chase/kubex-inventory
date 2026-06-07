@@ -29,9 +29,11 @@ Matching rules must be surrounded by double quotes and are in the format:
 All values in `software.csv` are case insensitive.
 
 #### Matching rule examples
+```
 Karpenter, Node Autoscaler, "container Equals karpenter"<br>
 Kubescape, Security Suite, "pod Contains kubescape"<br>
 Kubex, Kubernetes Optimization, "container StartsWith kubex"<br>
+```
 
 ## Disclaimer
 The software list can detect a couple hundred Kubernetes software packages, but it's not even close to complete.  If it's not detecting a piece of software you know is in the cluster, add a signature in `software.csv`.  Enjoy!
