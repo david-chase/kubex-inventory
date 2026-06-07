@@ -40,7 +40,9 @@ Here is an interesting sample command-line that will scan a customer instance an
 
 `kubex-inventory.ps1 -instance sandbox | grep "Kubex Automation"`
 
-## Disclaimer
-The software list can detect a couple hundred Kubernetes software packages, but it's not even close to complete.  If it's not detecting a piece of software you know is in the cluster, add a signature in `software.csv`.  
+## Disclaimers
+The tool doesn't output software versions -- that data doesn't exist in the Kubex schema.
+
+The software list can detect a few hundred Kubernetes software packages, but it's not even close to complete.  If it's not detecting a piece of software you know is in the cluster, add a signature in `software.csv`.  
 
 Enjoy!
