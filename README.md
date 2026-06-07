@@ -8,7 +8,9 @@ This script will connect to a Kubex instance and show you a list of all the soft
 #### CSV example
 This will save the output in .CSV format for slicing & dicing in Excel.  This is NOT a readable format, it's for generating reports.
 
-`kubex-inventory.ps1 -user "dchase@densify.com" -pass "NotMyPassword" -instance "sandbox" -csv > "Sandbox Software.csv"`
+``` PowerShell
+kubex-inventory.ps1 -user "dchase@densify.com" -pass "NotMyPassword" -instance "sandbox" -csv > "Sandbox Software.csv"
+```
 
 #### Save the output for later
 You can pipe the output to a file if you want to save a human-readable copy for later.  (Think before/after comparisons.)
