@@ -57,6 +57,8 @@ Kubex, Kubernetes Optimization, "container StartsWith kubex"
 ## Disclaimers
 The tool doesn't output software versions -- that data doesn't exist in the Kubex schema.
 
+The tool can't detect software that runs as a native sidecar because Kubex doesn't collect data for init containers.
+
 The software list can detect a few hundred Kubernetes software packages, but it's not even close to complete.  If it's not detecting a piece of software you know is in the cluster, add a signature in `software.csv`.  
 
 Enjoy!
