@@ -19,7 +19,7 @@ Here is an interesting sample command-line that will scan a customer instance an
 `kubex-inventory.ps1 -instance sandbox | grep "Kubex Automation"`
 
 ## How it works
-There's no magic going on here.  `software.csv` contains a list of software packages and the matching logic to identify them.  The format of the file is:
+Simple pattern matching.  `software.csv` contains a list of software packages and the matching logic to identify them.  The format of the file is:
 
 `<Software Package>, <Software Category>, "<Matching rule>"`
 
