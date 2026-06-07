@@ -36,4 +36,6 @@ Kubex, Kubernetes Optimization, "container StartsWith kubex"
 ```
 
 ## Disclaimer
-The software list can detect a couple hundred Kubernetes software packages, but it's not even close to complete.  If it's not detecting a piece of software you know is in the cluster, add a signature in `software.csv`.  Enjoy!
+The software list can detect a couple hundred Kubernetes software packages, but it's not even close to complete.  If it's not detecting a piece of software you know is in the cluster, add a signature in `software.csv`.  
+
+Enjoy!
