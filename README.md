@@ -30,9 +30,9 @@ All values in `software.csv` are case insensitive.
 
 #### Matching rule examples
 ```
-Karpenter, Node Autoscaler, "container Equals karpenter"<br>
-Kubescape, Security Suite, "pod Contains kubescape"<br>
-Kubex, Kubernetes Optimization, "container StartsWith kubex"<br>
+Karpenter, Node Autoscaler, "container Equals karpenter"
+Kubescape, Security Suite, "pod Contains kubescape"
+Kubex, Kubernetes Optimization, "container StartsWith kubex"
 ```
 
 ## Disclaimer
