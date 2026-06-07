@@ -8,8 +8,14 @@ This script will connect to a Kubex instance and download information on every c
 If you specify the -csv option from the command-line all output will be in CSV format for import into Excel.  One line for each Container that matches a known software package.
 
 #### CSV example
+This will save the output in .CSV format for slicing & dicing in Excel.  This is NOT a readable format, it's for generating reports.
 
 `kubex-inventory.ps1 -user "dchase@densify.com" -pass "NotMyPassword" -instance "sandbox" -csv > "Sandbox Software.csv"`
+
+#### Save the output for later
+You can pipe the output to a file if you want to save a human-readable copy for later.  (Think before/after comparisons.)
+
+`kubex-inventory.ps1 -instance sandbox > "Sandbox Software Report.txt"`
 
 #### Detecting Kubex Automation upgrade
 Here is an interesting sample command-line that will scan a customer instance and identify every instance of Kubex Automation components.  This allows you to see if they've upgraded from the Kubex Automation Controller (Deprecated) to the Kubex Automation Engine.
