@@ -1,10 +1,11 @@
 [CmdletBinding()]
 param (
-    [string]$host_param,
+    [string]$instance_param,
     [string]$scheme_param,
     [string]$port_param,
     [string]$user_param,
     [string]$pass_param,
+    [string]$baseurl_param,
     [switch]$csv
 )
 
@@ -24,11 +25,12 @@ $CsvPath = Join-Path -Path ${ScriptDir} -ChildPath "software.csv"
 
 # Initialize Settings Dictionary
 $Settings = @{
-    "host"   = $null
+    "instance"   = $null
     "scheme" = "https://"
     "port"   = ":8443"
     "user"   = $null
     "pass"   = $null
+    "baseurl" = ".kubex.ai"
 }
 
 # 1. Read Settings Hierarchy: INI -> Command-Line -> Prompt Fallback
@@ -45,14 +47,15 @@ if (Test-Path -Path ${IniPath}) {
 }
 
 # Apply Command-Line Overrides explicitly
-if (-not [string]::IsNullOrEmpty(${host_param}))   { $Settings["host"]   = ${host_param} }
+if (-not [string]::IsNullOrEmpty(${instance_param}))   { $Settings["instance"]   = ${instance_param} }
 if (-not [string]::IsNullOrEmpty(${scheme_param})) { $Settings["scheme"] = ${scheme_param} }
 if (-not [string]::IsNullOrEmpty(${port_param}))   { $Settings["port"]   = ${port_param} }
 if (-not [string]::IsNullOrEmpty(${user_param}))   { $Settings["user"]   = ${user_param} }
 if (-not [string]::IsNullOrEmpty(${pass_param}))   { $Settings["pass"]   = ${pass_param} }
+if (-not [string]::IsNullOrEmpty(${baseurl_param}))   { $Settings["baseurl"]   = ${basurl_param} }
 
 # Prompt Interactively for completely empty configurations
-if ([string]::IsNullOrEmpty($Settings["host"])) { $Settings["host"] = Read-Host -Prompt "Enter Host (e.g. cluster.kubex.ai)" }
+if ([string]::IsNullOrEmpty($Settings["instance"])) { $Settings["instance"] = Read-Host -Prompt "Enter instance (e.g. cluster.kubex.ai)" }
 if ([string]::IsNullOrEmpty($Settings["user"])) { $Settings["user"] = Read-Host -Prompt "Enter Username" }
 if ([string]::IsNullOrEmpty($Settings["pass"])) { 
     if ($csv) {
@@ -60,10 +63,6 @@ if ([string]::IsNullOrEmpty($Settings["pass"])) {
     } else {
         $Settings["pass"] = Read-Host -Prompt "Enter Password" -AsSecureString 
     }
-}
-
-if (-not $csv) {
-    Write-Host "Settings parsed successfully."
 }
 
 # 2. Parse software.csv
@@ -92,7 +91,7 @@ if (Test-Path -Path ${CsvPath}) {
 }
 
 if (-not $csv) {
-    Write-Host "Software list parsed successfully."
+    Write-Output "Connecting to $($Settings['instance']) instance."
 }
 
 # 3. Compose Base URL (Silent Step)
@@ -100,7 +99,7 @@ $CleanScheme = $Settings["scheme"]
 if (-not ($CleanScheme -match '://$')) {
     $CleanScheme = "${CleanScheme}://"
 }
-$CleanHost = $Settings["host"] -replace '^https?://', ''
+$CleanHost = ( $Settings["instance"] -replace '^https?://', '' ) + $Settings["baseurl"]
 $CleanPort = $Settings["port"]
 if (-not ($CleanPort -match '^:')) {
     $CleanPort = ":${CleanPort}"
@@ -150,10 +149,6 @@ if (-not $JwtToken) {
     exit 1
 }
 
-if (-not $csv) {
-    Write-Host "Authorization token obtained successfully."
-}
-
 # 5. Query GraphQL API
 $GraphUrl = "${BaseUrl}/api/graphql/containers"
 $Headers = [System.Collections.Generic.Dictionary[string,string]]::new()
@@ -175,9 +170,6 @@ try {
 }
 
 $RawContainers = $GraphResponse.data.getContainerDetailsByViewAndFilter
-if (-not $csv) {
-    Write-Host "Graph API query context evaluated successfully."
-}
 
 # 6. Setup Tracking Entities & Sorting Hierarchy (Broad-to-Narrow Sequence)
 $Containers = $RawContainers | ForEach-Object {
@@ -206,7 +198,7 @@ function Flush-ClusterSoftware {
     if ([string]::IsNullOrEmpty(${TargetCluster}) -or -not $ClusterSoftwareMapping.ContainsKey(${TargetCluster})) { return }
     
     $GlobalClusters[${TargetCluster}] = $true
-    Write-Host "`n${TargetCluster}" -ForegroundColor Yellow
+    Write-Output "`n${TargetCluster}" 
     
     # Sort software names alphabetically
     $SoftwareKeys = @($ClusterSoftwareMapping[${TargetCluster}].Keys) | Sort-Object
@@ -224,7 +216,7 @@ function Flush-ClusterSoftware {
         }
         
         # Write the software name to the host
-        Write-Host "  - ${SoftwareName}, ${Category} ${NamespaceString} " -ForegroundColor DarkGreen
+        Write-Output "  - ${SoftwareName}, ${Category} ${NamespaceString} " 
         
         # NOTE: Removed local scope counter from here to avoid scope corruption
     }
