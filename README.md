@@ -1,8 +1,10 @@
 # Summary
-This script will connect to a Kubex instance and show you a list of all the software running in that environment, by cluster and namespace.  It does so by connecting to the instance, running a Graph API query to return every container running in the cluster, then comparing those containers, pods, and namespaces against a known list of software signatures.  It's not fool-proof, but it's a start!
+This PowerShell script will connect to a Kubex instance and show you a list of all the software running in that environment, by cluster and namespace.  It does so by connecting to the instance, running a Graph API query to return every container running in the cluster, then comparing those containers, pods, and namespaces against a known list of software signatures.  It's not fool-proof, but it's a start!
 
 ## Syntax
-`kubex-inventory.ps1 [-user=<username>] [-pass=<instance password>] [-instance <instancename>] [-baseurl ".kubex.ai" | ".densify.com" ] [-csv]`
+``` PowerShell
+kubex-inventory.ps1 [-user=<username>] [-pass=<instance password>] [-instance <instancename>] [-baseurl ".kubex.ai" | ".densify.com" ] [-csv]
+```
 
 ## Examples
 #### CSV example
@@ -15,18 +17,22 @@ kubex-inventory.ps1 -user "dchase@densify.com" -pass "NotMyPassword" -instance "
 #### Save the output for later
 You can pipe the output to a file if you want to save a human-readable copy for later.  (Think before/after comparisons.)
 
-`kubex-inventory.ps1 -instance sandbox > "Sandbox Software Report.txt"`
+``` PowerShell
+kubex-inventory.ps1 -instance sandbox > "Sandbox Software Report.txt"
+```
 
 #### Detecting Kubex Automation upgrade
 Here is an interesting sample command-line that will scan a customer instance and identify every instance of Kubex Automation components.  This allows you to see if they've upgraded from the Kubex Automation Controller (Deprecated) to the Kubex Automation Engine.
 
-`kubex-inventory.ps1 -instance sandbox | grep "Kubex Automation"`
+``` PowerShell
+kubex-inventory.ps1 -instance sandbox | grep "Kubex Automation"
+```
 
 ## Saving defaults
 All command-line parameters may also be specified in a file named `kubex-inventory.ini` which must be saved in the same folder as the script.  
 
 Here's a sample `kubex-inventory.ini`
-```
+``` plaintext
 user=dchase@densify.com
 pass=NotMyPassword
 baseurl=.kubex.ai
@@ -48,7 +54,7 @@ Matching rules must be surrounded by double quotes and are in the format:
 All values in `software.csv` are case insensitive.
 
 #### Matching rule examples
-```
+``` plaintext
 Karpenter, Node Autoscaler, "container Equals karpenter"
 Kubescape, Security Suite, "pod Contains kubescape"
 Kubex, Kubernetes Optimization, "container StartsWith kubex"
