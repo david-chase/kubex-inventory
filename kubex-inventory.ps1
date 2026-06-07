@@ -63,7 +63,7 @@ if ([string]::IsNullOrEmpty($Settings["pass"])) {
 }
 
 if (-not $csv) {
-    Write-Output "Settings parsed successfully."
+    Write-Host "Settings parsed successfully."
 }
 
 # 2. Parse software.csv
@@ -92,7 +92,7 @@ if (Test-Path -Path ${CsvPath}) {
 }
 
 if (-not $csv) {
-    Write-Output "Software list parsed successfully."
+    Write-Host "Software list parsed successfully."
 }
 
 # 3. Compose Base URL (Silent Step)
@@ -151,7 +151,7 @@ if (-not $JwtToken) {
 }
 
 if (-not $csv) {
-    Write-Output "Authorization token obtained successfully."
+    Write-Host "Authorization token obtained successfully."
 }
 
 # 5. Query GraphQL API
@@ -176,7 +176,7 @@ try {
 
 $RawContainers = $GraphResponse.data.getContainerDetailsByViewAndFilter
 if (-not $csv) {
-    Write-Output "Graph API query context evaluated successfully."
+    Write-Host "Graph API query context evaluated successfully."
 }
 
 # 6. Setup Tracking Entities & Sorting Hierarchy (Broad-to-Narrow Sequence)
@@ -206,9 +206,10 @@ function Flush-ClusterSoftware {
     if ([string]::IsNullOrEmpty(${TargetCluster}) -or -not $ClusterSoftwareMapping.ContainsKey(${TargetCluster})) { return }
     
     $GlobalClusters[${TargetCluster}] = $true
-    Write-Host ${TargetCluster} -ForegroundColor Yellow
+    Write-Host "`n${TargetCluster}" -ForegroundColor Yellow
     
-    $SoftwareKeys = @($ClusterSoftwareMapping[${TargetCluster}].Keys)
+    # Sort software names alphabetically
+    $SoftwareKeys = @($ClusterSoftwareMapping[${TargetCluster}].Keys) | Sort-Object
     foreach ($SoftwareName in $SoftwareKeys) {
         $SoftwareData = $ClusterSoftwareMapping[${TargetCluster}][$SoftwareName]
         $Category = $SoftwareData.Type
@@ -219,14 +220,13 @@ function Flush-ClusterSoftware {
         if ($NamespaceCount -gt 3) {
             $NamespaceString = "(${NamespaceCount} namespaces)"
         } else {
-            $NamespaceString = "[" + ($DistinctNamespaces -join ", ") + "]"
+            $NamespaceString = "(" + ($DistinctNamespaces -join ", ") + ")"
         }
         
-        Write-Host "  - " -NoNewline
-        Write-Host ${SoftwareName} -ForegroundColor DarkGreen -NoNewline
-        Write-Host ", ${Category} ${NamespaceString}"
+        # Write the software name to the host
+        Write-Host "  - ${SoftwareName}, ${Category} ${NamespaceString} " -ForegroundColor DarkGreen
         
-        $GlobalMatchesCount++
+        # NOTE: Removed local scope counter from here to avoid scope corruption
     }
 }
 
@@ -276,8 +276,10 @@ foreach ($Pod in $SortedContainers) {
             if ($csv) {
                 # Immediate inline CSV record row delivery streaming to StdOut with no spaces after commas
                 Write-Output "$($Rule.Software),$($Rule.Type),$($Pod.namespace),$($Pod.pod),$($Pod.container)"
-                $GlobalMatchesCount++
                 $GlobalClusters[$Pod.cluster] = $true
+                
+                # FIXED: Count match during CSV generation stream
+                $GlobalMatchesCount++
             } else {
                 if (-not $ClusterSoftwareMapping.ContainsKey($Pod.cluster)) {
                     $ClusterSoftwareMapping[$Pod.cluster] = @{}
@@ -287,6 +289,8 @@ foreach ($Pod in $SortedContainers) {
                         Type       = $Rule.Type
                         Namespaces = @{}
                     }
+                    # FIXED: In Standard UI view, count a unique match per piece of software per cluster 
+                    $GlobalMatchesCount++
                 }
                 $ClusterSoftwareMapping[$Pod.cluster][$Rule.Software].Namespaces[$Pod.namespace] = $true
             }
