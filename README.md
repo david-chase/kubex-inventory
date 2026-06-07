@@ -22,14 +22,14 @@ Matching rules must be surrounded by double quotes and are in the format:
 
 `"<Object Type> <Operator> <String>"`
 
-**Object Type** can be "namespace", "pod", or "container".
-**Operator** can be "Equals", "DoesntEqual", "Contains", "DoesntContain", "StartsWith", "DoesntStartWith", "EndsWith", or "DoesntEndWith".
+**Object Type** can be "namespace", "pod", or "container".<br>
+**Operator** can be "Equals", "DoesntEqual", "Contains", "DoesntContain", "StartsWith", "DoesntStartWith", "EndsWith", or "DoesntEndWith".<br>
 **String** is the string to match.
 
 ## Matching rule examples
-Karpenter, Node Autoscaler, "container Equals karpenter"
-Kubescape, Security Suite, "pod Contains kubescape"
-Kubex, Kubernetes Optimization, "container StartsWith kubex"
+Karpenter, Node Autoscaler, "container Equals karpenter"<br>
+Kubescape, Security Suite, "pod Contains kubescape"<br>
+Kubex, Kubernetes Optimization, "container StartsWith kubex"<br>
 
 # Disclaimer
 The software list can detect a couple hundred Kubernetes software packages, but it's not even close to complete.  If it's not detecting a piece of software you know is in the cluster, add a signature in `software.csv`.  Enjoy!
