@@ -30,7 +30,7 @@ pass=NotMyPassword
 baseurl=.kubex.ai
 ```
 
-## How it works
+## ADVANCED - Modifying the Software Matching List
 Simple pattern matching.  `software.csv` contains a list of software packages and the matching logic to identify them.  The format of the file is:
 
 `<Software Package>, <Software Category>, "<Matching rule>"`
