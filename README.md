@@ -32,9 +32,6 @@ pass=NotMyPassword
 baseurl=.kubex.ai
 ```
 
-(Note that the -csv option only works from the command-line.)
-
-
 ## How it works
 Simple pattern matching.  `software.csv` contains a list of software packages and the matching logic to identify them.  The format of the file is:
 
