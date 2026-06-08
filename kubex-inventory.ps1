@@ -6,8 +6,14 @@ param (
     [string]$user_param,
     [string]$pass_param,
     [string]$baseurl_param,
-    [switch]$csv
+    [switch]$csv,
+    [switch]$timer
 )
+
+# Start the stopwatch
+if( $timer ) {
+    $ScriptTimer = [System.Diagnostics.Stopwatch]::StartNew()
+}
 
 Clear-Host
 
@@ -301,6 +307,15 @@ if (-not $csv) {
     Write-Output "Total clusters: $($GlobalClusters.Count)"
     Write-Output "Total namespaces: $($GlobalNamespaces.Count)"
     Write-Output "Total pieces of software identified: ${GlobalMatchesCount}"
+}
+
+# Stop the stopwatch
+if( $timer ) {
+    $ScriptTimer.Stop()
+
+    # Format and output the elapsed time as mm:ss
+    $ElapsedTime = [string]::Format("{0:d2}:{1:d2}", [int]$ScriptTimer.Elapsed.TotalMinutes, $ScriptTimer.Elapsed.Seconds)
+    Write-Host "Total elapsed time: $ElapsedTime"
 }
 
 exit 0

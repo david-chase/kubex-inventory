@@ -124,6 +124,8 @@ Cisco ThousandEyes Enterprise Agent, Observability, "namespace equals thousandey
 Cisco ThousandEyes Enterprise Agent, Observability, "pod startswith thousandeyes"
 ClickHouse, Database, "container equals clickhouse"
 ClickHouse, Database, "pod startswith clickhouse-operator"
+Cloud Carbon Footprint, Sustainability, "container equals cloud-carbon-footprint"
+Cloud Carbon Footprint, Sustainability, "namespace equals cloud-carbon-footprint"
 Cloudability, FinOps, "namespace equals cloudability"
 Cloudability, FinOps, "namespace equals ibm-finops-agent"
 Cloudability, FinOps, "pod contains finops-agent"
