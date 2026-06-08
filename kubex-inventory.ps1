@@ -315,7 +315,7 @@ if( $timer ) {
 
     # Format and output the elapsed time as mm:ss
     $ElapsedTime = [string]::Format("{0:d2}:{1:d2}", [int]$ScriptTimer.Elapsed.TotalMinutes, $ScriptTimer.Elapsed.Seconds)
-    Write-Host "Total elapsed time: $ElapsedTime"
+    Write-Host "`nTotal elapsed time: $ElapsedTime"
 }
 
 exit 0
