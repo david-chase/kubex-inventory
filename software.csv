@@ -1,3 +1,6 @@
+WarpStream, Data Streaming, "container equals warpstream-agent"
+Apache Iggy, Data Streaming, "container equals iggy-server"
+Apache Iggy Web UI, Application Performance Management, "container equals iggy-web-ui"
 ACK DynamoDB Controller, Cloud Management, "pod startswith ack-dynamodb-controller"
 ACK RDS Controller, Cloud Management, "pod startswith ack-rds-controller"
 ACK S3 Controller, Cloud Management, "pod startswith ack-s3-controller"
