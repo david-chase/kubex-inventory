@@ -15,7 +15,7 @@ if( $timer ) {
     $ScriptTimer = [System.Diagnostics.Stopwatch]::StartNew()
 }
 
-Clear-Host
+# Clear-Host
 
 # Clear host and output banners only if not outputting raw CSV data
 if (-not $csv) {
