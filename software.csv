@@ -1,3 +1,5 @@
+kube-bench, Security, "container equals kube-bench"
+kube-bench, Security, "pod startswith kube-bench"
 ACK DynamoDB Controller, Cloud Management, "pod startswith ack-dynamodb-controller"
 ACK RDS Controller, Cloud Management, "pod startswith ack-rds-controller"
 ACK S3 Controller, Cloud Management, "pod startswith ack-s3-controller"
